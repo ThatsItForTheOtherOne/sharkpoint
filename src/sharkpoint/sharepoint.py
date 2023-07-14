@@ -1,19 +1,20 @@
 import azure.identity
 import requests
 import json
-import sharepoint_site
+from . import sharepoint_site
 import azure.core.credentials
+
 
 class SharePoint:
     """
-    A class used to represent an organization's SharePoint instance using the SharePoint REST API v1. 
+    A class used to represent an organization's SharePoint instance using the SharePoint REST API v1.
     ...
-    
+
     Parameters
     ----------
     base_url : str
         The URL of a Sharepoint instance, ex. contoso.sharepoint.com
-    azure_identity : TokenCredential 
+    azure_identity : TokenCredential
         An azure-identity token credential.
 
     Attributes
@@ -29,7 +30,11 @@ class SharePoint:
         Returns a SharepointSite object for a specific SharePoint site
     """
 
-    def __init__(self, sharepoint_url: str, azure_identity: azure.core.credentials.TokenCredential) -> None:
+    def __init__(
+        self,
+        sharepoint_url: str,
+        azure_identity: azure.core.credentials.TokenCredential,
+    ) -> None:
         self.base_url = sharepoint_url
         self._scope = f"{self.base_url}/.default"
         self._identity = azure_identity
@@ -54,7 +59,7 @@ class SharePoint:
         # fmt: off
         request = request["d"]["query"]["PrimaryQueryResult"]["RelevantResults"]["Table"]["Rows"]["results"]
         # fmt: on
-        
+
         sites = []
         for x in request:
             site_dict = {
@@ -70,6 +75,12 @@ class SharePoint:
         ----------
         site_name : str
             The user-facing name of a SharePoint site
+
+        Raises
+        ------
+        KeyError
+            If the subsite does not exist
+
         """
 
         site_url = next(
@@ -79,6 +90,4 @@ class SharePoint:
             raise KeyError("Site not found.")
         else:
             site_url = site_url["Site Path"]
-        return sharepoint_site.SharepointSite(
-            site_name, site_url, self.base_url, self._header
-        )
+        return sharepoint_site.SharepointSite(site_url, self.base_url, self._header)

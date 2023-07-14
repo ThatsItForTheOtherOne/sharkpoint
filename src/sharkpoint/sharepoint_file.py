@@ -15,7 +15,6 @@ class SharepointFile(io.BytesIO):
         Manually check a file into SharePoint and remove the file lock
     """
 
-
     def __init__(self, header, sharepoint_site: str, filepath: str, checkout: bool):
         self._header = header
         self._site = sharepoint_site
@@ -50,7 +49,7 @@ class SharepointFile(io.BytesIO):
         post_request.update(self._header)
         file_content = super().getvalue()
         requests.put(api_url, data=file_content, headers=post_request)
-    
+
     def check_back_in(self):
         if self._checkout:
             api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files('{self._filename}')/CheckIn(comment='Comment',checkintype=0)"
@@ -60,7 +59,11 @@ class SharepointFile(io.BytesIO):
         self.check_back_in()
         return super().close()
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.check_back_in()
         return super().__exit__(exc_type, exc_val, exc_tb)
-

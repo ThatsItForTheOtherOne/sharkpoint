@@ -27,3 +27,14 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/ThatsItForTheOtherOne/sharkpoint"
 "Bug Tracker" = "https://github.com/ThatsItForTheOtherOne/sharkpoint/issues"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+pythonpath = [
+  "src"
+]
+env_files = ".env_tests"

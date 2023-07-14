@@ -1,1 +1,7 @@
 dist
+.env
+.env_tests
+*.pfx
+*.cer
+__pycache__
+.pytest_cache

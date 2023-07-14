@@ -1,30 +1,32 @@
 import json
 import requests
-import sharepoint_file
+from . import sharepoint_file
 
 
 class SharepointSite:
     """
     SharePointSite(sharepoint_site_name, sharepoint_site_url, sharepoint_base_url, header)
 
-    A class used to represent a SharePoint site using the SharePoint REST API v1. 
+    A class used to represent a SharePoint site using the SharePoint REST API v1.
     ...
-    
+
     Parameters
     ----------
-    sharepoint_site_name : str
-        The user-facing name of the Sharepoint site
-    sharepoint_site_url : str 
+    sharepoint_site_url : str
         The URL of the Sharepoint site
     sharepoint_base_url : str
         The URL of the Sharepoint instance
     header : dict
         The header for requests made to the API containing the Bearer token
-    
+
     Attributes
     ----------
     site_name : str
         The user-facing name of the Sharepoint site
+    description : str
+        The description of the Sharepoint site
+    subsites : dict
+        A list of dicts of Sharepoint subsites
 
     Methods
     -------
@@ -34,16 +36,16 @@ class SharepointSite:
         Creates a new directory in a document library
     open(path, checkout = False)
         Downloads a file from a document library and returns a SharepointFile object
+    get_subsite(site_name)
+        Returns a SharepointSite object for a subsite
     """
 
     def __init__(
         self,
-        sharepoint_site_name: str,
         sharepoint_site_url: str,
         sharepoint_base_url: str,
         header,
     ) -> None:
-        self.site_name = sharepoint_site_name
         self._site_url = sharepoint_site_url
         self._base_url = sharepoint_base_url
         self._header = header
@@ -130,10 +132,10 @@ class SharepointSite:
 
         if path_list[0] not in self._libraries:
             raise FileNotFoundError(f"Document Library {path_list[0]} not found.")
-        
+
         if path_list[-1] in self.listdir("/".join(path_list[:-1])):
             raise FileExistsError(f"Folder {path_list[-1]} exists.")
-        
+
         api_url = f"{self._site_url}/_api/web/folders"
         payload = json.dumps(
             {
@@ -173,3 +175,53 @@ class SharepointSite:
             filepath=filepath,
             checkout=checkout,
         )
+
+    @property
+    def site_name(self):
+        api_url = f"{self._site_url}/_api/web/title"
+        request = json.loads(requests.get(api_url, headers=self._header).content)
+        return request["d"]["Title"]
+
+    @property
+    def description(self):
+        api_url = f"{self._site_url}/_api/web/description"
+        request = json.loads(requests.get(api_url, headers=self._header).content)
+        return request["d"]["Description"]
+
+    @property
+    def subsites(self):
+        api_url = f"{self._site_url}/_api/web/webs/?$select=title,Url"
+        request = requests.get(api_url, headers=self._header).text
+        request = json.loads(request)
+        request = request["d"]["results"]
+        sites = []
+        for x in request:
+            site_dict = {
+                "Site Name": x["Title"],
+                "Site Path": x["Url"],
+            }
+            sites.append(site_dict)
+        return sites
+
+    def get_subsite(self, site_name: str):
+        """Grab a subsite,
+
+        Parameters
+        ----------
+        site_name : str
+            The user-facing name of a SharePoint subsite
+
+        Raises
+        ------
+        KeyError
+            If the subsite does not exist.
+        """
+
+        site_url = next(
+            (item for item in self.sites if item["Site Name"] == site_name), None
+        )
+        if site_url is None:
+            raise KeyError("Site not found.")
+        else:
+            site_url = site_url["Site Path"]
+        return SharepointSite(site_url, self.base_url, self._header)
