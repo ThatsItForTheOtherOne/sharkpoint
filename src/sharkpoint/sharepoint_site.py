@@ -5,7 +5,7 @@ from . import sharepoint_file
 
 class SharepointSite:
     """
-    SharePointSite(sharepoint_site_name, sharepoint_site_url, sharepoint_base_url, header)
+    SharePointSite(sharepoint_site_url, sharepoint_base_url, header)
 
     A class used to represent a SharePoint site using the SharePoint REST API v1.
     ...
@@ -21,12 +21,14 @@ class SharepointSite:
 
     Attributes
     ----------
-    site_name : str
+    name : str
         The user-facing name of the Sharepoint site
     description : str
         The description of the Sharepoint site
-    subsites : dict
+    subsites : list
         A list of dicts of Sharepoint subsites
+    libraries : list
+        A list of strings of Sharepoint document library names
 
     Methods
     -------
@@ -49,20 +51,15 @@ class SharepointSite:
         self._site_url = sharepoint_site_url
         self._base_url = sharepoint_base_url
         self._header = header
-        self._libraries = self._get_libraries()
 
-    def _get_libraries(self):
+    @property
+    def libraries(self):
         api_url = f"{self._site_url}/_api/web/lists?$select=Title,ServerRelativeUrl&$filter=BaseTemplate eq 101 and hidden eq false&$expand=RootFolder"
         request = requests.get(api_url, headers=self._header)
         request = json.loads(request.content)
 
         request = request["d"]["results"]
-        libraries = {}
-
-        for library in request:
-            library_name = library["RootFolder"]["Name"]
-            library_path = library["RootFolder"]["ServerRelativeUrl"]
-            libraries[library_name] = library_path
+        libraries = [library["RootFolder"]["Name"] for library in request]
 
         return libraries
 
@@ -73,18 +70,24 @@ class SharepointSite:
         ----------
         path : str
             The path of the directory to search, relative to the site as a whole. File paths are UNIX-like.
+
         Raises
         ------
         FileNotFoundError
             If the document library does not exist or if a nonexistent folder is searched.
         Exception
             If an API error has occured that is not otherwise caught.
+
+        Returns
+        -------
+        list
+            List of files and directories
         """
 
         path_list = path.split("/")
         path_list = list(filter(None, path_list))
 
-        if path_list[0] not in self._libraries:
+        if path_list[0] not in self.libraries:
             raise FileNotFoundError(f"Document Library {path_list[0]} Not Found.")
 
         api_url = f"{self._site_url}/_api/web/GetFolderByServerRelativeUrl('{'/'.join(path_list)}')?$expand=Folders,Files"
@@ -117,6 +120,7 @@ class SharepointSite:
         ----------
         path : str
             The path of the directory to create, relative to the site as a whole. File paths are UNIX-like.
+
         Raises
         ------
         FileExistsError
@@ -130,7 +134,7 @@ class SharepointSite:
         path_list = path.split("/")
         path_list = list(filter(None, path_list))
 
-        if path_list[0] not in self._libraries:
+        if path_list[0] not in self.libraries:
             raise FileNotFoundError(f"Document Library {path_list[0]} not found.")
 
         if path_list[-1] in self.listdir("/".join(path_list[:-1])):
@@ -163,6 +167,7 @@ class SharepointSite:
             The path of the file to return, relative to the site as a whole. File paths are UNIX-like.
         checkout : bool
             If True, the file will be checked out of Sharepoint and locked.
+
         Returns
         ------
         SharepointFile
@@ -177,7 +182,7 @@ class SharepointSite:
         )
 
     @property
-    def site_name(self):
+    def name(self):
         api_url = f"{self._site_url}/_api/web/title"
         request = json.loads(requests.get(api_url, headers=self._header).content)
         return request["d"]["Title"]
@@ -204,7 +209,7 @@ class SharepointSite:
         return sites
 
     def get_subsite(self, site_name: str):
-        """Grab a subsite,
+        """Grab a subsite.
 
         Parameters
         ----------
@@ -215,13 +220,17 @@ class SharepointSite:
         ------
         KeyError
             If the subsite does not exist.
+
+        Returns
+        ------
+        SharepointSite
         """
 
         site_url = next(
-            (item for item in self.sites if item["Site Name"] == site_name), None
+            (item for item in self.subsites if item["Site Name"] == site_name), None
         )
         if site_url is None:
             raise KeyError("Site not found.")
         else:
             site_url = site_url["Site Path"]
-        return SharepointSite(site_url, self.base_url, self._header)
+        return SharepointSite(site_url, self._base_url, self._header)
