@@ -176,7 +176,8 @@ class SharepointSite:
             File-like object.
         """
         mode = mode.replace("t", "")
-
+        if mode not in ("w", "w+", "wb", "w+b", "r", "r+", "rb", "r+b"):
+            raise ValueError(f"Invalid mode. Supported modes are 'r', 'r+', 'w', 'w+', 'rb', 'wb', 'r+b', 'w+b'.")
         if "a" in mode:
             raise NotImplementedError()
         elif "b" in mode:
