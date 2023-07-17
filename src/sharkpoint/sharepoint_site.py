@@ -158,7 +158,7 @@ class SharepointSite:
             else:
                 raise Exception(request["error"]["message"]["value"])
 
-    def open(self, filepath: str, checkout: bool = False):
+    def open(self, filepath: str, checkout: bool = False, mode: str = "r+b"):
         """Open a file from a SharePoint document library and return a file-like object.
 
         Parameters
@@ -167,19 +167,34 @@ class SharepointSite:
             The path of the file to return, relative to the site as a whole. File paths are UNIX-like.
         checkout : bool
             If True, the file will be checked out of Sharepoint and locked.
+        mode : str
+            File mode, append mode is not supported. Default is "r+b".
 
         Returns
         ------
         SharepointFile
             File-like object.
         """
+        mode = mode.replace("t", "")
 
-        return sharepoint_file.SharepointFile(
-            header=self._header,
-            sharepoint_site=self._site_url,
-            filepath=filepath,
-            checkout=checkout,
-        )
+        if "a" in mode:
+            raise NotImplementedError()
+        elif "b" in mode:
+            return sharepoint_file.SharepointBytesFile(
+                header=self._header,
+                sharepoint_site=self._site_url,
+                filepath=filepath,
+                checkout=checkout,
+                mode=mode,
+            )
+        else:
+            return sharepoint_file.SharepointTextFile(
+                header=self._header,
+                sharepoint_site=self._site_url,
+                filepath=filepath,
+                checkout=checkout,
+                mode=mode,
+            )
 
     @property
     def name(self):

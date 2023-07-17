@@ -5,16 +5,15 @@ from sharkpoint import sharepoint_site
 from sharkpoint.sharepoint import (
     SharePoint,
 )
-from sharkpoint.sharepoint_file import (
-    SharepointFile,
-)
+from sharkpoint.sharepoint_file import SharepointBytesFile, SharepointTextFile
 from sharkpoint.sharepoint_site import (
     SharepointSite,
 )
 
 __all__ = [
     "SharePoint",
-    "SharepointFile",
+    "SharepointBytesFile",
+    "SharepointTextFile",
     "SharepointSite",
     "sharepoint",
     "sharepoint_file",
