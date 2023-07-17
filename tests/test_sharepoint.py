@@ -63,9 +63,10 @@ def test_string_file(sharepoint_instance, azure_identity):
         file.write(random_str)
 
     with site.open(f"Shared Documents/{rand_file_name}", mode="r") as file:
-        assert file.getvalue() == random_str
+        assert file.read() == random_str
     
     with site.open(f"Shared Documents/{rand_file_name}", mode="r+") as file:
+        file.seek(0, io.SEEK_END)
         file.write(random_str)
         file.write(random_str)
 
@@ -73,6 +74,7 @@ def test_string_file(sharepoint_instance, azure_identity):
         test = io.StringIO()
         test.write(random_str)
         test.write(random_str)
-
-        assert test.getvalue() == file.getvalue()
+        test.write(random_str)
+        test.seek(0)
+        assert test.read() == file.read()
 

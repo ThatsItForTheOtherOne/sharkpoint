@@ -172,7 +172,7 @@ class SharepointTextFile(io.StringIO):
         requests.put(api_url, data=file_content, headers=post_request)
 
     def read(self, size=-1):
-        if self._mode not in ("rb", "r+b", "w+b"):
+        if self._mode not in ("r", "r+", "w+"):
             raise IOError("File not open in read mode.")
         return super().read(size)
 
