@@ -5,9 +5,9 @@ import requests
 
 class SharepointBytesFile(io.BytesIO):
     """
-    SharepointFile(header, sharepoint_site, filepath, checkout)
+    SharepointBytesFile(header, sharepoint_site, filepath, checkout)
 
-    A file-like class used to represent a SharePoint file using the SharePoint REST API v1.
+    A file-like class used to represent a SharePoint binary file using the SharePoint REST API v1.
 
     Methods
     -------
@@ -52,14 +52,45 @@ class SharepointBytesFile(io.BytesIO):
         api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files('{self._filename}')/$value"
         file = requests.get(api_url, headers=self._header)
         return file.content
-
-    def write(self, data):
-        if self._mode not in ("wb", "w+b", "r+b"):
+    
+    def read(self, size: int = -1) -> bytes:
+        if not self.readable():
+            raise IOError("File not open in read mode.")
+        return super().read(size)
+    
+    def write(self, bytes):
+        if not self.writable():
             raise IOError("File not open in write mode.")
-        super().write(data)
+        return super().write(bytes)
+    
+    def truncate(self, __size: int | None = ...) -> int:
+            if not self.seekable():
+                raise IOError("File not open in seekable mode.")
+            return super().truncate(__size)
+    
+    def readline(self, size: int = -1) -> str:
+        if not self.readable():
+            raise IOError("File not open in read mode.")
+        return super().readline(size)
+    
+    def readlines(self, size: int = -1) -> list[str]:
+        if not self.readable():
+            raise IOError("File not open in read mode.")
+        return super().readlines(size)
+    
+    def seek(self, cookie: int, whence: int = 0) -> int:
+        if not self.seekable():
+            raise IOError("File not open in seekable mode.")
+        return super().seek(cookie, whence)
+    
+    def tell(self) -> int:
+        if not self.seekable():
+            raise IOError("File not open in seekable mode.")
+        return super().tell()
+    
 
     def flush(self):
-        if self._mode not in ("wb", "w+b", "r+b"):
+        if not self.writable():
             raise IOError("File not open in write mode.")
         super().flush()
         api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files/add(url='{self._filename}', overwrite=true)"
@@ -73,12 +104,7 @@ class SharepointBytesFile(io.BytesIO):
         post_request.update(self._header)
         file_content = super().getvalue()
         requests.put(api_url, data=file_content, headers=post_request)
-
-    def read(self, size=-1):
-        if self._mode not in ("rb", "r+b", "w+b"):
-            raise IOError("File not open in read mode.")
-        return super().read(size)
-
+            
     def check_back_in(self):
         if self._checkout:
             api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files('{self._filename}')/CheckIn(comment='Comment',checkintype=0)"
@@ -86,10 +112,30 @@ class SharepointBytesFile(io.BytesIO):
 
     def close(self):
         self.check_back_in()
-        if self._mode in ("wb", "w+b", "r+b"):
+        
+        if self.writable():
             self.flush()
+        
         super().close()
+    
+    def readable(self) -> bool:
+        if self._mode != "wb":
+            return True
+        else:
+            return False
 
+    def writable(self) -> bool:
+        if self._mode != "rb":
+            return True
+        else:
+            return False
+    
+    def seekable(self) -> bool:
+        if "+" in self._mode:
+            return True
+        else:
+            return False
+    
     def __enter__(self):
         return self
 
@@ -104,9 +150,9 @@ class SharepointBytesFile(io.BytesIO):
 
 class SharepointTextFile(io.StringIO):
     """
-    SharepointFile(header, sharepoint_site, filepath, checkout)
+    SharepointTextFile(header, sharepoint_site, filepath, checkout)
 
-    A file-like class used to represent a SharePoint file using the SharePoint REST API v1.
+    A file-like class used to represent a SharePoint text file using the SharePoint REST API v1.
 
     Methods
     -------
@@ -150,13 +196,8 @@ class SharepointTextFile(io.StringIO):
         file = requests.get(api_url, headers=self._header)
         return file.content
 
-    def write(self, data):
-        if self._mode not in ("w", "w+", "r+"):
-            raise IOError("File not open in write mode.")
-        super().write(data)
-
     def flush(self):
-        if self._mode not in ("w", "w+", "r+"):
+        if not self.writable():
             raise IOError("File not open in write mode.")
         super().flush()
         api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files/add(url='{self._filename}', overwrite=true)"
@@ -172,9 +213,39 @@ class SharepointTextFile(io.StringIO):
         requests.put(api_url, data=file_content, headers=post_request)
 
     def read(self, size=-1):
-        if self._mode not in ("r", "r+", "w+"):
+        if not self.readable():
             raise IOError("File not open in read mode.")
         return super().read(size)
+    
+    def write(self, bytes):
+        if not self.writable():
+            raise IOError("File not open in write mode.")
+        return super().write(bytes)
+    
+    def truncate(self, __size: int | None = ...) -> int:
+            if not self.seekable():
+                raise IOError("File not open in seekable mode.")
+            return super().truncate(__size)
+    
+    def readline(self, size: int = -1) -> str:
+        if not self.readable():
+            raise IOError("File not open in read mode.")
+        return super().readline(size)
+    
+    def readlines(self, size: int = -1) -> list[str]:
+        if not self.readable():
+            raise IOError("File not open in read mode.")
+        return super().readlines(size)
+    
+    def seek(self, cookie: int, whence: int = 0) -> int:
+        if not self.seekable():
+            raise IOError("File not open in seekable mode.")
+        return super().seek(cookie, whence)
+    
+    def tell(self) -> int:
+        if not self.seekable():
+            raise IOError("File not open in seekable mode.")
+        return super().tell()
 
     def check_back_in(self):
         if self._checkout:
@@ -183,9 +254,27 @@ class SharepointTextFile(io.StringIO):
 
     def close(self):
         self.check_back_in()
-        if self._mode in ("w", "w+", "r+"):
+        if self.writable():
             self.flush()
         super().close()
+    
+    def readable(self) -> bool:
+        if self._mode != "w":
+            return True
+        else:
+            return False
+
+    def writable(self) -> bool:
+        if self._mode != "r":
+            return True
+        else:
+            return False
+    
+    def seekable(self) -> bool:
+        if "+" in self._mode:
+            return True
+        else:
+            return False
 
     def __enter__(self):
         return self
@@ -197,3 +286,4 @@ class SharepointTextFile(io.StringIO):
         exc_tb: TracebackType | None,
     ) -> None:
         super().__exit__(exc_type, exc_val, exc_tb)
+    

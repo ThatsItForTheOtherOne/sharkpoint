@@ -40,6 +40,12 @@ def test_bytes_file(sharepoint_instance, azure_identity):
 
     with site.open(f"Shared Documents/{rand_file_name}", mode="wb") as file:
         file.write(random_bytes)
+        try: 
+            file.read(-1)
+        except IOError:
+            pass
+        else:
+            raise AssertionError()
 
     with site.open(f"Shared Documents/{rand_file_name}", mode="rb") as file:
         assert file.getvalue() == random_bytes
@@ -64,7 +70,14 @@ def test_string_file(sharepoint_instance, azure_identity):
 
     with site.open(f"Shared Documents/{rand_file_name}", mode="w") as file:
         file.write(random_str)
+        try: 
+            file.read(-1)
+        except IOError:
+            pass
+        else:
+            raise AssertionError()
 
+        
     with site.open(f"Shared Documents/{rand_file_name}", mode="r") as file:
         assert file.read() == random_str
 
