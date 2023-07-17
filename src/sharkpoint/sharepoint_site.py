@@ -158,7 +158,7 @@ class SharepointSite:
             else:
                 raise Exception(request["error"]["message"]["value"])
 
-    def open(self, filepath: str, checkout: bool = False, mode: str = "r+b"):
+    def open(self, filepath: str, mode: str = "r", checkout: bool = False):
         """Open a file from a SharePoint document library and return a file-like object.
 
         Parameters
