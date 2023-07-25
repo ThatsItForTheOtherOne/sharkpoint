@@ -1,8 +1,7 @@
-import azure.identity
 import requests
 import json
 from . import sharepoint_site
-import azure.core.credentials
+from azure.core.credentials import TokenCredential
 
 
 class SharePoint:
@@ -19,6 +18,8 @@ class SharePoint:
 
     Attributes
     ----------
+    site_names : str
+        a list of all user-facing site names in SharePoint
     sites : dict
         a dictionary of all sites in SharePoint, the key is the user-facing name and the value is the URL
     base_url : str
@@ -28,17 +29,18 @@ class SharePoint:
     -------
     get_site(site_name)
         Returns a SharepointSite object for a specific SharePoint site
+    create_site(site_name, path, owner, description, web_template, lcid, site_design_id)
+        Creates a new site and returns a SharepointSite object for the site
     """
 
     def __init__(
         self,
         sharepoint_url: str,
-        azure_identity: azure.core.credentials.TokenCredential,
+        azure_identity: TokenCredential,
     ) -> None:
         self.base_url = sharepoint_url
         self._scope = f"{self.base_url}/.default"
         self._identity = azure_identity
-        self.sites = self._initalize_sites()
 
     @property
     def _token(self):
@@ -52,24 +54,19 @@ class SharePoint:
             "Content-Type": "application/json;odata=verbose",
         }
 
-    def _initalize_sites(self):
-        api_url = f"{self.base_url}/_api/search/query?querytext='contentclass:STS_Site contentclass:STS_Web'&selectproperties='Title,Path'"
+    @property
+    def sites(self) -> dict:
+        api_url = f"{self.base_url}_api/search/query?querytext='contentclass:STS_Site'"
         request = requests.get(api_url, headers=self._header).text
         request = json.loads(request)
         # fmt: off
         request = request["d"]["query"]["PrimaryQueryResult"]["RelevantResults"]["Table"]["Rows"]["results"]
         # fmt: on
+        # By G-d Almighty this looks ugly, but this is the easiest way to parse the table for what I need
+        sites_dict = {site["Cells"]["results"][2]["Value"]: site["Cells"]["results"][5]["Value"] for site in request}
+        return sites_dict
 
-        sites = []
-        for x in request:
-            site_dict = {
-                "Site Name": x["Cells"]["results"][0]["Value"],
-                "Site Path": x["Cells"]["results"][1]["Value"],
-            }
-            sites.append(site_dict)
-        return sites
-
-    def get_site(self, site_name):
+    def get_site(self, site_name: str) -> sharepoint_site.SharepointSite:
         """
         Parameters
         ----------
@@ -82,12 +79,43 @@ class SharePoint:
             If the subsite does not exist
 
         """
-
-        site_url = next(
-            (item for item in self.sites if item["Site Name"] == site_name), None
-        )
-        if site_url is None:
-            raise KeyError("Site not found.")
+        site_url = None
+        sites = self.sites
+        if site_name in sites.keys():
+            site_url = sites[site_name]
         else:
-            site_url = site_url["Site Path"]
+            raise KeyError("Site not found.")
+
         return sharepoint_site.SharepointSite(site_url, self.base_url, self._header)
+
+    def create_site(
+        self,
+        site_name: str,
+        path: str,
+        owner: str,
+        description: str,
+        web_template: str = "sts#3",
+        lcid: int = 1033,
+        site_design_id: str = "00000000-0000-0000-0000-000000000000",
+    ) -> sharepoint_site.SharepointSite:
+        api_url = f"{self.base_url}/_api/SPSiteManager/create"
+        request = {
+            "request": {
+                "Title": site_name,
+                "Url": f"{self.base_url}/sites/{path}",
+                "Lcid": str(lcid),
+                "ShareByEmailEnabled": "false",
+                "Description": description,
+                "WebTemplate": web_template,
+                "SiteDesignId": site_design_id,
+                "Owner": owner,
+            }
+        }
+        request_return = requests.post(
+            api_url, data=json.dumps(request), headers=self._header
+        )
+        request_return = json.loads(request_return.content)
+        if request_return["d"]["Create"]["SiteStatus"] == 2:
+            return sharepoint_site.SharepointSite(request_return["d"]["Create"]["SiteUrl"], self.base_url, self._header)
+        else:
+            raise Exception(request_return["d"]["Create"]["SiteStatus"])

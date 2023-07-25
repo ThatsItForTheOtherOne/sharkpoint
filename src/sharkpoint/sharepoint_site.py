@@ -1,4 +1,5 @@
 import json
+from typing import Self
 import requests
 from . import sharepoint_file
 
@@ -25,9 +26,9 @@ class SharepointSite:
         The user-facing name of the Sharepoint site
     description : str
         The description of the Sharepoint site
-    subsites : list
-        A list of dicts of Sharepoint subsites
-    libraries : list
+    subsites : dict
+        A dict of SharePoint subsites, user-facing name is key and url is value
+    libraries : list[str]
         A list of strings of Sharepoint document library names
 
     Methods
@@ -40,6 +41,10 @@ class SharepointSite:
         Downloads a file from a document library and returns a SharepointFile object
     get_subsite(site_name)
         Returns a SharepointSite object for a subsite
+    rmdir(path)
+        Removes a directory in a document library
+    remove(path)
+        Removes a file in a document library
     """
 
     def __init__(
@@ -63,27 +68,7 @@ class SharepointSite:
 
         return libraries
 
-    def listdir(self, path: str):
-        """List all files in a directory on a SharePoint document library.
-
-        Parameters
-        ----------
-        path : str
-            The path of the directory to search, relative to the site as a whole. File paths are UNIX-like.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the document library does not exist or if a nonexistent folder is searched.
-        Exception
-            If an API error has occured that is not otherwise caught.
-
-        Returns
-        -------
-        list
-            List of files and directories
-        """
-
+    def _file_and_directory_list(self, path: str):
         path_list = path.split("/")
         path_list = list(filter(None, path_list))
 
@@ -104,16 +89,57 @@ class SharepointSite:
         request = request["d"]
         files = request["Files"]["results"]
         folders = request["Folders"]["results"]
-        directory_list = []
 
-        for file in files:
-            directory_list.append(file["Name"])
-        for folder in folders:
-            directory_list.append(folder["Name"])
+        return [file["Name"] for file in files], [folder["Name"] for folder in folders]
 
-        return directory_list
+    def list_files(self, path: str) -> list[str]:
+        """List all files in a directory on a SharePoint document library.
 
-    def mkdir(self, path: str):
+        Parameters
+        ----------
+        path : str
+            The path of the directory to search, relative to the site as a whole. File paths are UNIX-like.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the document library does not exist or if a nonexistent folder is searched.
+        Exception
+            If an API error has occured that is not otherwise caught.
+
+        Returns
+        -------
+        list
+            List of files
+        """
+
+        files_list, _ = self._file_and_directory_list(path)
+        return files_list
+
+    def listdir(self, path: str) -> list[str]:
+        """List all files and folders in a directory on a SharePoint document library.
+
+        Parameters
+        ----------
+        path : str
+            The path of the directory to search, relative to the site as a whole. File paths are UNIX-like.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the document library does not exist or if a nonexistent folder is searched.
+        Exception
+            If an API error has occured that is not otherwise caught.
+
+        Returns
+        -------
+        list
+            List of files and directories
+        """
+        files_list, folders_list = self._file_and_directory_list(path)
+        return files_list + folders_list
+
+    def mkdir(self, path: str) -> None:
         """Create a new directory on a SharePoint document library.
 
         Parameters
@@ -158,6 +184,99 @@ class SharepointSite:
             else:
                 raise Exception(request["error"]["message"]["value"])
 
+    def rmdir(self, path: str) -> None:
+        """Delete a directory on a SharePoint document library.
+
+        Parameters
+        ----------
+        path : str
+            The path of the directory to delete, relative to the site as a whole. File paths are UNIX-like.
+
+        Raises
+        ------
+        FileExistsError
+            If the folder already exists.
+        FileNotFoundError
+            If the document library does not exist.
+        Exception
+            If an API error has occured that is not otherwise caught.
+        NotADirectoryError
+            If the file referenced is not a directory.
+        """
+
+        path_list = path.split("/")
+        path_list = list(filter(None, path_list))
+
+        if path_list[0] not in self.libraries:
+            raise FileNotFoundError(f"Document Library {path_list[0]} not found.")
+
+        if path_list[0] is path_list[-1]:
+            raise Exception("Will not delete document library.")
+
+        if path_list[0] in self.list_files("/".join(path_list[:-1])):
+            raise NotADirectoryError()
+        elif self.listdir(path):
+            raise OSError("Directory is not empty.")
+
+        api_url = f"{self._site_url}/_api/web/GetFolderByServerRelativeUrl('{path}')"
+
+        headers = {"X-HTTP-Method": "DELETE"}
+        headers.update(self._header)
+
+        request = requests.post(url=api_url, headers=headers)
+
+        if len(request.content) > 0:
+            request = json.loads(request.content)
+        if "error" in request:
+            error_code = request["error"]["code"]
+            raise Exception(request["error"]["message"]["value"])
+
+    def remove(self, path: str) -> None:
+        """Delete a file on a SharePoint document library.
+
+        Parameters
+        ----------
+        path : str
+            The path of the file to delete, relative to the site as a whole. File paths are UNIX-like.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist.
+        Exception
+            If an API error has occured that is not otherwise caught.
+        NotADirectoryError
+            If the file referenced is not a directory.
+        """
+
+        path_list = path.split("/")
+        path_list = list(filter(None, path_list))
+        directory_path = "/".join(path_list[:-1])
+        file_name = path_list[-1]
+
+        if path_list[0] not in self.libraries:
+            raise FileNotFoundError(f"Document Library {path_list[0]} not found.")
+
+        if path_list[0] is path_list[-1]:
+            raise Exception("Will not delete document library.")
+
+        if file_name not in self.list_files(directory_path):
+            raise FileNotFoundError()
+
+        api_url = f"{self._site_url}/_api/web/GetFolderByServerRelativeUrl('{directory_path}')/Files('{file_name}')"
+
+        headers = {"X-HTTP-Method": "DELETE"}
+
+        headers.update(self._header)
+
+        request = requests.post(url=api_url, headers=headers)
+
+        if len(request.content) > 0:
+            request = json.loads(request.content)
+        if "error" in request:
+            error_code = request["error"]["code"]
+            raise Exception(request["error"]["message"]["value"])
+
     def open(self, filepath: str, mode: str = "r", checkout: bool = False):
         """Open a file from a SharePoint document library and return a file-like object.
 
@@ -200,33 +319,27 @@ class SharepointSite:
             )
 
     @property
-    def name(self):
+    def name(self) -> str:
         api_url = f"{self._site_url}/_api/web/title"
         request = json.loads(requests.get(api_url, headers=self._header).content)
         return request["d"]["Title"]
 
     @property
-    def description(self):
+    def description(self) -> str:
         api_url = f"{self._site_url}/_api/web/description"
         request = json.loads(requests.get(api_url, headers=self._header).content)
         return request["d"]["Description"]
 
     @property
-    def subsites(self):
+    def subsites(self) -> dict:
         api_url = f"{self._site_url}/_api/web/webs/?$select=title,Url"
         request = requests.get(api_url, headers=self._header).text
         request = json.loads(request)
         request = request["d"]["results"]
-        sites = []
-        for x in request:
-            site_dict = {
-                "Site Name": x["Title"],
-                "Site Path": x["Url"],
-            }
-            sites.append(site_dict)
+        sites = {site['Title']: site['Url'] for site in request}
         return sites
-
-    def get_subsite(self, site_name: str):
+    
+    def get_subsite(self, site_name: str) -> Self:
         """Grab a subsite.
 
         Parameters
@@ -244,11 +357,11 @@ class SharepointSite:
         SharepointSite
         """
 
-        site_url = next(
-            (item for item in self.subsites if item["Site Name"] == site_name), None
-        )
-        if site_url is None:
-            raise KeyError("Site not found.")
+        site_url = None
+        subsites = self.subsites
+        if site_name in subsites.keys():
+            site_url = subsites[site_name]
         else:
-            site_url = site_url["Site Path"]
-        return SharepointSite(site_url, self._base_url, self._header)
+            raise KeyError("Site not found.")
+
+        return SharepointSite(site_url, self.base_url, self._header)
