@@ -33,17 +33,17 @@ class SharepointSite:
 
     Methods
     -------
-    listdir(path)
+    listdir(path) : list[str]
         Returns a list of directories in a document library
-    mkdir(path)
+    mkdir(path) : None
         Creates a new directory in a document library
-    open(path, checkout = False)
+    open(path, checkout = False) : SharepointBytesFile or SharepointTextFile
         Downloads a file from a document library and returns a SharepointFile object
-    get_subsite(site_name)
+    get_subsite(site_name) : SharepointSite
         Returns a SharepointSite object for a subsite
-    rmdir(path)
+    rmdir(path) : None
         Removes a directory in a document library
-    remove(path)
+    remove(path) : None
         Removes a file in a document library
     """
 
@@ -109,7 +109,7 @@ class SharepointSite:
 
         Returns
         -------
-        list
+        list[str]
             List of files
         """
 
@@ -133,7 +133,7 @@ class SharepointSite:
 
         Returns
         -------
-        list
+        list[str]
             List of files and directories
         """
         files_list, folders_list = self._file_and_directory_list(path)
@@ -291,7 +291,7 @@ class SharepointSite:
 
         Returns
         ------
-        SharepointFile
+        SharepointBytesFile or SharepointTextFile
             File-like object.
         """
         mode = mode.replace("t", "")
@@ -336,9 +336,9 @@ class SharepointSite:
         request = requests.get(api_url, headers=self._header).text
         request = json.loads(request)
         request = request["d"]["results"]
-        sites = {site['Title']: site['Url'] for site in request}
+        sites = {site["Title"]: site["Url"] for site in request}
         return sites
-    
+
     def get_subsite(self, site_name: str) -> Self:
         """Grab a subsite.
 

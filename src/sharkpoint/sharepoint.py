@@ -27,9 +27,9 @@ class SharePoint:
 
     Methods
     -------
-    get_site(site_name)
+    get_site(site_name) : SharepointSite
         Returns a SharepointSite object for a specific SharePoint site
-    create_site(site_name, path, owner, description, web_template, lcid, site_design_id)
+    create_site(site_name, path, owner, description, web_template, lcid, site_design_id) : SharepointSite
         Creates a new site and returns a SharepointSite object for the site
     """
 
@@ -63,7 +63,10 @@ class SharePoint:
         request = request["d"]["query"]["PrimaryQueryResult"]["RelevantResults"]["Table"]["Rows"]["results"]
         # fmt: on
         # By G-d Almighty this looks ugly, but this is the easiest way to parse the table for what I need
-        sites_dict = {site["Cells"]["results"][2]["Value"]: site["Cells"]["results"][5]["Value"] for site in request}
+        sites_dict = {
+            site["Cells"]["results"][2]["Value"]: site["Cells"]["results"][5]["Value"]
+            for site in request
+        }
         return sites_dict
 
     def get_site(self, site_name: str) -> sharepoint_site.SharepointSite:
@@ -116,6 +119,8 @@ class SharePoint:
         )
         request_return = json.loads(request_return.content)
         if request_return["d"]["Create"]["SiteStatus"] == 2:
-            return sharepoint_site.SharepointSite(request_return["d"]["Create"]["SiteUrl"], self.base_url, self._header)
+            return sharepoint_site.SharepointSite(
+                request_return["d"]["Create"]["SiteUrl"], self.base_url, self._header
+            )
         else:
             raise Exception(request_return["d"]["Create"]["SiteStatus"])

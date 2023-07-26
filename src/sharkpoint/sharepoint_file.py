@@ -88,7 +88,7 @@ class SharepointBytesFile(io.BytesIO):
             raise IOError("File not open in seekable mode.")
         return super().tell()
 
-    def flush(self):
+    def flush(self) -> None:
         if not self.writable():
             raise IOError("File not open in write mode.")
         super().flush()
@@ -104,12 +104,12 @@ class SharepointBytesFile(io.BytesIO):
         file_content = super().getvalue()
         requests.put(api_url, data=file_content, headers=post_request)
 
-    def check_back_in(self):
+    def check_back_in(self) -> None:
         if self._checkout:
             api_url = f"{self._site}/_api/web/GetFolderByServerRelativeUrl('{self._path}')/Files('{self._filename}')/CheckIn(comment='Comment',checkintype=0)"
             requests.post(api_url, headers=self._header)
 
-    def close(self):
+    def close(self) -> None:
         self.check_back_in()
 
         if self.writable():
